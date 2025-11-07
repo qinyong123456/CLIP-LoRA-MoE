@@ -17,7 +17,12 @@ def main():
     set_random_seed(args.seed)
     
     # CLIP
-    clip_model, preprocess = clip.load(args.backbone)
+    moe_config = {
+        'num_experts': args.moe_num_experts,
+        'top_k': args.moe_top_k,
+        'dropout': args.moe_dropout
+    }
+    clip_model, preprocess = clip.load(args.backbone, moe_vision_layers=args.moe_vision_layers, moe_text_layers=args.moe_text_layers, moe_config=moe_config)
     clip_model.eval()
     logit_scale = 100
 
