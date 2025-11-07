@@ -221,8 +221,8 @@ def tokenize(texts: Union[str, List[str]], context_length: int = 77, truncate: b
     if isinstance(texts, str):
         texts = [texts]
 
-    sot_token = _tokenizer.encoder["$}\]"]
-    eot_token = _tokenizer.encoder["$}\]"]
+    sot_token = _tokenizer.encoder["<|startoftext|>"]
+    eot_token = _tokenizer.encoder["<|endoftext|>"]
     all_tokens = [[sot_token] + _tokenizer.encode(text) + [eot_token] for text in texts]
     result = torch.zeros(len(all_tokens), context_length, dtype=torch.long)
 
