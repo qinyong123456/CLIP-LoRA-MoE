@@ -113,6 +113,41 @@ def get_lora_and_gate_parameters(model, bias='none'):
             params.append(param)
     return params
 
+def mark_lora_gate_and_experts_as_trainable(model: nn.Module, bias: str = 'none') -> None:
+    for n, p in model.named_parameters():
+        train_cond = (
+            ('lora_' in n) or
+            ('gate.weight' in n) or
+            ('mlp.experts' in n)
+        )
+        p.requires_grad = bool(train_cond)
+
+    if bias == 'none':
+        return
+    elif bias == 'all':
+        for n, p in model.named_parameters():
+            if 'bias' in n:
+                p.requires_grad = True
+    elif bias == 'lora_only':
+        for m in model.modules():
+            if isinstance(m, LoRALayer) and \
+                    hasattr(m, 'bias') and \
+                    m.bias is not None:
+                m.bias.requires_grad = True
+    else:
+        raise NotImplementedError
+
+def get_lora_gate_and_expert_parameters(model, bias='none'):
+    params = []
+    for name, param in model.named_parameters():
+        if ('lora_' in name) or ('gate.weight' in name) or ('mlp.experts' in name):
+            params.append(param)
+        elif bias == 'all' and ('bias' in name):
+            params.append(param)
+        elif bias == 'lora_only' and ('lora_' in name):
+            params.append(param)
+    return params
+
 def get_lora_parameters(model, bias='none'):
     params = []
     for name, param in model.named_parameters():

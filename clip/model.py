@@ -602,6 +602,48 @@ def build_model(state_dict: dict, moe_vision_layers: int = 0, moe_text_layers: i
         if key in state_dict:
             del state_dict[key]
 
+    # Adapt pretrained state_dict when MoE is enabled by replicating base MLP weights
+    # into each expert for the replaced MoE layers, and load with strict=False.
+    if (moe_vision_layers and moe_vision_layers > 0) or (moe_text_layers and moe_text_layers > 0):
+        num_experts = (moe_config or {}).get("num_experts", 1)
+        # Vision side (only for ViT visual tower)
+        try:
+            if vit and moe_vision_layers and moe_vision_layers > 0 and isinstance(vision_layers, int):
+                v_total = vision_layers
+                v_start = max(0, v_total - moe_vision_layers)
+                for i in range(v_start, v_total):
+                    base_prefix = f"visual.transformer.resblocks.{i}.mlp"
+                    for name in ["c_fc.weight", "c_fc.bias", "c_proj.weight", "c_proj.bias"]:
+                        base_key = f"{base_prefix}.{name}"
+                        if base_key in state_dict:
+                            tensor = state_dict[base_key]
+                            for e in range(num_experts):
+                                expert_key = f"{base_prefix}.experts.{e}.{name}"
+                                state_dict[expert_key] = tensor.clone()
+                            # remove base key to avoid unexpected keys
+                            del state_dict[base_key]
+        except Exception:
+            pass
+
+        # Text side
+        try:
+            if moe_text_layers and moe_text_layers > 0:
+                t_total = transformer_layers
+                t_start = max(0, t_total - moe_text_layers)
+                for i in range(t_start, t_total):
+                    base_prefix = f"transformer.resblocks.{i}.mlp"
+                    for name in ["c_fc.weight", "c_fc.bias", "c_proj.weight", "c_proj.bias"]:
+                        base_key = f"{base_prefix}.{name}"
+                        if base_key in state_dict:
+                            tensor = state_dict[base_key]
+                            for e in range(num_experts):
+                                expert_key = f"{base_prefix}.experts.{e}.{name}"
+                                state_dict[expert_key] = tensor.clone()
+                            del state_dict[base_key]
+        except Exception:
+            pass
+
     convert_weights(model)
-    model.load_state_dict(state_dict)
+    # Load with strict=False to allow newly introduced gate/expert params to use model init
+    model.load_state_dict(state_dict, strict=False)
     return model.eval()

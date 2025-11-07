@@ -43,6 +43,7 @@ def get_arguments():
     parser.add_argument('--moe_top_k', default=2, type=int, help='number of experts to route to for each token')
     parser.add_argument('--moe_dropout', default=0.0, type=float, help='dropout rate for MoE layer')
     parser.add_argument('--train_router', default=False, action='store_true', help='train the MoE router')
+    parser.add_argument('--train_experts', default=False, action='store_true', help='train the MoE experts')
     parser.add_argument('--load_balancing_coef', default=0.01, type=float, help='load balancing loss coefficient')
 
     parser.add_argument('--save_path', default=None, help='path to save the lora modules after training, not saved if None')

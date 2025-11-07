@@ -3,7 +3,18 @@ import torch.nn.functional as F
 
 from utils import *
 
-from loralib.utils import mark_only_lora_as_trainable, apply_lora, get_lora_parameters, lora_state_dict, save_lora, load_lora, mark_lora_and_gate_as_trainable, get_lora_and_gate_parameters
+from loralib.utils import (
+    mark_only_lora_as_trainable,
+    apply_lora,
+    get_lora_parameters,
+    lora_state_dict,
+    save_lora,
+    load_lora,
+    mark_lora_and_gate_as_trainable,
+    get_lora_and_gate_parameters,
+    mark_lora_gate_and_experts_as_trainable,
+    get_lora_gate_and_expert_parameters,
+)
 from loralib import layers as lora_layers
 
 def evaluate_lora(args, clip_model, loader, dataset):
@@ -77,7 +88,10 @@ def run_lora(args, clip_model, logit_scale, dataset, train_loader, val_loader, t
         print("**** Test accuracy: {:.2f}. ****\n".format(acc_test))
         return
 
-    if args.train_router:
+    if args.train_router and args.train_experts:
+        mark_lora_gate_and_experts_as_trainable(clip_model)
+        optimizer = torch.optim.AdamW(get_lora_gate_and_expert_parameters(clip_model), weight_decay=1e-2, betas=(0.9, 0.999), lr=args.lr)
+    elif args.train_router:
         mark_lora_and_gate_as_trainable(clip_model)
         optimizer = torch.optim.AdamW(get_lora_and_gate_parameters(clip_model), weight_decay=1e-2, betas=(0.9, 0.999), lr=args.lr)
     else:
