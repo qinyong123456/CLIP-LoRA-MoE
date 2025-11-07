@@ -1,5 +1,11 @@
 import torch
 import torch.nn.functional as F
+import os
+import csv
+try:
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
 
 from utils import *
 
@@ -113,6 +119,7 @@ def run_lora(args, clip_model, logit_scale, dataset, train_loader, val_loader, t
     scaler = torch.cuda.amp.GradScaler()
     count_iters = 0
     finish = False
+    loss_history = []
     while count_iters < total_iters:
         clip_model.train()
         acc_train = 0
@@ -158,6 +165,8 @@ def run_lora(args, clip_model, logit_scale, dataset, train_loader, val_loader, t
             cosine_similarity = logit_scale * image_features @ text_features.t()
             loss = F.cross_entropy(cosine_similarity, target)
             total_loss += loss
+            # Record per-iteration total loss (includes load balancing if enabled)
+            loss_history.append(total_loss.detach().item())
             acc_train += cls_acc(cosine_similarity, target) * target.shape[0]
             loss_epoch += total_loss.item() * target.shape[0]
             tot_samples += target.shape[0]
@@ -186,9 +195,35 @@ def run_lora(args, clip_model, logit_scale, dataset, train_loader, val_loader, t
             acc_val = evaluate_lora(args, clip_model, val_loader, dataset)
             print("**** Val accuracy: {:.2f}. ****\n".format(acc_val))
         
-    
+        
     acc_test = evaluate_lora(args, clip_model, test_loader, dataset)
     print("**** Final test accuracy: {:.2f}. ****\n".format(acc_test))
+    # Save loss curve
+    try:
+        save_root = args.save_path if args.save_path is not None else '.'
+        backbone = args.backbone.replace('/', '').replace('-', '').lower()
+        out_dir = os.path.join(save_root, backbone, args.dataset, f"{args.shots}shots", f"seed{args.seed}")
+        os.makedirs(out_dir, exist_ok=True)
+        csv_path = os.path.join(out_dir, 'loss_curve.csv')
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['iteration', 'loss'])
+            for i, l in enumerate(loss_history, 1):
+                writer.writerow([i, l])
+        if plt is not None:
+            plt.figure()
+            plt.plot(loss_history)
+            plt.xlabel('Iteration')
+            plt.ylabel('Total Loss')
+            plt.title('Training Loss Curve')
+            plt.grid(True)
+            png_path = os.path.join(out_dir, 'loss_curve.png')
+            plt.savefig(png_path, dpi=150)
+            plt.close()
+        else:
+            print(f"Saved loss CSV to {csv_path}. matplotlib not available; skipping PNG plot.")
+    except Exception as e:
+        print(f"Warning: failed to save loss curve: {e}")
     
     if args.save_path != None:
         save_lora(args, list_lora_layers)
