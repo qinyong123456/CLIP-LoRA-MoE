@@ -148,6 +148,15 @@ def get_lora_gate_and_expert_parameters(model, bias='none'):
             params.append(param)
     return params
 
+def ensure_trainable_params_fp32(model: nn.Module) -> None:
+    """Cast all trainable parameters to float32 to work with GradScaler.
+    CLIP converts weights to fp16 for inference; when training with GradScaler,
+    trainable params must be fp32 to avoid 'Attempting to unscale FP16 gradients'.
+    """
+    for n, p in model.named_parameters():
+        if p.requires_grad and p.dtype != torch.float32:
+            p.data = p.data.float()
+
 def get_lora_parameters(model, bias='none'):
     params = []
     for name, param in model.named_parameters():

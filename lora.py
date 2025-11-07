@@ -14,6 +14,7 @@ from loralib.utils import (
     get_lora_and_gate_parameters,
     mark_lora_gate_and_experts_as_trainable,
     get_lora_gate_and_expert_parameters,
+    ensure_trainable_params_fp32,
 )
 from loralib import layers as lora_layers
 
@@ -90,12 +91,15 @@ def run_lora(args, clip_model, logit_scale, dataset, train_loader, val_loader, t
 
     if args.train_router and args.train_experts:
         mark_lora_gate_and_experts_as_trainable(clip_model)
+        ensure_trainable_params_fp32(clip_model)
         optimizer = torch.optim.AdamW(get_lora_gate_and_expert_parameters(clip_model), weight_decay=1e-2, betas=(0.9, 0.999), lr=args.lr)
     elif args.train_router:
         mark_lora_and_gate_as_trainable(clip_model)
+        ensure_trainable_params_fp32(clip_model)
         optimizer = torch.optim.AdamW(get_lora_and_gate_parameters(clip_model), weight_decay=1e-2, betas=(0.9, 0.999), lr=args.lr)
     else:
         mark_only_lora_as_trainable(clip_model)
+        ensure_trainable_params_fp32(clip_model)
         optimizer = torch.optim.AdamW(get_lora_parameters(clip_model), weight_decay=1e-2, betas=(0.9, 0.999), lr=args.lr)
 
     total_iters = args.n_iters * args.shots
